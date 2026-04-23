@@ -190,6 +190,10 @@
       cursor: not-allowed;
       opacity: 0.62;
     }
+    .challenge-toggle.rule-note {
+      cursor: default;
+      opacity: 1;
+    }
     .challenge-toggle input:disabled + .switch-visual {
       opacity: 0.65;
     }
@@ -646,20 +650,18 @@
 
         <div class="challenge-box">
           <h3>挑战入口</h3>
-          <div class="challenge-status" id="challengeStatus">未开启挑战。可选 10 抽、20 抽、30 抽挑战。挑战会从全新状态开始，UP 到手或主动结束时会弹出总结报告。</div>
+          <div class="challenge-status" id="challengeStatus">未开启挑战。可选 30 抽、100 抽、200 抽挑战。30 抽抽到 UP 自动结算；100/200 抽不会因 UP 中断，用来看看一轮能出几个 UP。</div>
           <div class="challenge-buttons">
-            <button class="challenge-btn" id="challenge10Btn">10 抽挑战</button>
-            <button class="challenge-btn" id="challenge20Btn">20 抽挑战</button>
             <button class="challenge-btn" id="challenge30Btn">30 抽挑战</button>
+            <button class="challenge-btn" id="challenge100Btn">100 抽挑战</button>
+            <button class="challenge-btn" id="challenge200Btn">200 抽挑战</button>
           </div>
-          <label class="challenge-toggle" id="challengeEndlessLabel">
+          <div class="challenge-toggle rule-note">
             <span class="challenge-toggle-text">
-              <span class="challenge-toggle-title">无尽模式</span>
-              <span class="challenge-toggle-desc">开启后抽到 UP 不自动结算，只能主动结束挑战。</span>
+              <span class="challenge-toggle-title">挑战规则</span>
+              <span class="challenge-toggle-desc">30 抽：抽到 UP 自动终止；100/200 抽：抽到 UP 继续累计，抽完后看总数。</span>
             </span>
-            <input type="checkbox" id="challengeEndlessToggle">
-            <span class="switch-visual" aria-hidden="true"></span>
-          </label>
+          </div>
           <label class="challenge-toggle" id="challengePerverseLabel">
             <span class="challenge-toggle-text">
               <span class="challenge-toggle-title">变态模式</span>
@@ -778,7 +780,8 @@
         perverseMode: false,
         disableFeaturedGuarantee: false,
         obtainedUP: false,
-        obtainedUPAt: 0
+        obtainedUPAt: 0,
+        upCount: 0
       };
     }
 
@@ -798,7 +801,6 @@
         doubleFiveInTen: false,
         fullPityFive: false
       },
-      challengeEndlessMode: false,
       challengePerverseMode: false,
       challengeDisableFeaturedGuarantee: false,
       challenge: emptyChallenge()
@@ -820,11 +822,9 @@
       mobileSingleBtn: document.getElementById('mobileSingleBtn'),
       mobileTenBtn: document.getElementById('mobileTenBtn'),
       resetBtn: document.getElementById('resetBtn'),
-      challenge10Btn: document.getElementById('challenge10Btn'),
-      challenge20Btn: document.getElementById('challenge20Btn'),
       challenge30Btn: document.getElementById('challenge30Btn'),
-      challengeEndlessLabel: document.getElementById('challengeEndlessLabel'),
-      challengeEndlessToggle: document.getElementById('challengeEndlessToggle'),
+      challenge100Btn: document.getElementById('challenge100Btn'),
+      challenge200Btn: document.getElementById('challenge200Btn'),
       challengePerverseLabel: document.getElementById('challengePerverseLabel'),
       challengePerverseToggle: document.getElementById('challengePerverseToggle'),
       challengeDisableGuaranteeLabel: document.getElementById('challengeDisableGuaranteeLabel'),
@@ -979,36 +979,31 @@
     }
 
     function getChallengeConfigText(ch = state.challenge) {
-      const endlessText = ch.endlessMode ? '无尽模式' : '普通模式';
+      const stopRuleText = ch.endlessMode ? '抽到 UP 不终止' : '抽到 UP 自动终止';
       const perverseText = ch.perverseMode
         ? `变态模式开启，概率倍率 ${Math.round(getPerverseRateFactor(ch.workHours) * 100)}%，${ch.disableFeaturedGuarantee ? '大保底关闭' : '大保底保留'}`
         : '变态模式关闭';
 
-      return `${endlessText}；${perverseText}`;
+      return `${ch.total} 抽挑战，${stopRuleText}；${perverseText}`;
     }
 
     function getPendingChallengeConfigText() {
-      const endlessText = state.challengeEndlessMode ? '无尽模式' : '普通模式';
       const perverseText = state.challengePerverseMode
         ? `变态模式开启，初始概率倍率 100%，${state.challengeDisableFeaturedGuarantee ? '大保底关闭' : '大保底保留'}`
         : '变态模式关闭';
 
-      return `${endlessText}；${perverseText}`;
+      return `30 抽抽到 UP 自动终止；100/200 抽不中断累计 UP；${perverseText}`;
     }
 
     function renderChallengeConfigControls() {
       const active = state.challenge.active;
-      const endlessMode = active ? state.challenge.endlessMode : state.challengeEndlessMode;
       const perverseMode = active ? state.challenge.perverseMode : state.challengePerverseMode;
       const disableGuarantee = active ? state.challenge.disableFeaturedGuarantee : state.challengeDisableFeaturedGuarantee;
 
-      els.challengeEndlessToggle.checked = endlessMode;
       els.challengePerverseToggle.checked = perverseMode;
       els.challengeDisableGuaranteeToggle.checked = disableGuarantee;
-      els.challengeEndlessToggle.disabled = active;
       els.challengePerverseToggle.disabled = active;
       els.challengeDisableGuaranteeToggle.disabled = active || !perverseMode;
-      els.challengeEndlessLabel.classList.toggle('config-locked', active);
       els.challengePerverseLabel.classList.toggle('config-locked', active);
       els.challengeDisableGuaranteeLabel.classList.toggle('config-locked', active || !perverseMode);
     }
@@ -1017,15 +1012,15 @@
       const ch = state.challenge;
       renderChallengeConfigControls();
       if (!ch.active) {
-        els.challengeStatus.textContent = `未开启挑战。可选 10 抽、20 抽、30 抽挑战。当前配置：${getPendingChallengeConfigText()}。`;
+        els.challengeStatus.textContent = `未开启挑战。可选 30 抽、100 抽、200 抽挑战。当前配置：${getPendingChallengeConfigText()}。`;
       } else if (ch.remaining > 0) {
         const days = ch.workHours === 0 ? 0 : Math.ceil(ch.workHours / 4);
-        const upText = ch.obtainedUP ? '；UP 已到手' : '';
+        const upText = ch.upCount > 0 ? `；已出 ${ch.upCount} 个 UP` : '';
         els.challengeStatus.textContent = `挑战进行中（${getChallengeConfigText(ch)}）：剩余 ${ch.remaining} 抽；已爆肝 ${ch.workHours} 小时；已玩 ${days} 天；已充值 ${ch.rechargeYuan} 元；月卡补给 ${ch.monthlyCardPulls} 抽${upText}。`;
       } else {
         const days = ch.workHours === 0 ? 0 : Math.ceil(ch.workHours / 4);
-        const upText = ch.obtainedUP ? '；UP 已到手' : '';
-        els.challengeStatus.textContent = `挑战抽数已经用完（${getChallengeConfigText(ch)}）：已爆肝 ${ch.workHours} 小时；已玩 ${days} 天；已充值 ${ch.rechargeYuan} 元；月卡补给 ${ch.monthlyCardPulls} 抽${upText}。你现在可以选择充值、爆肝，或者主动结束挑战。`;
+        const upText = ch.upCount > 0 ? `；已出 ${ch.upCount} 个 UP` : '；本次未出 UP';
+        els.challengeStatus.textContent = `挑战抽数已经用完（${getChallengeConfigText(ch)}）：已爆肝 ${ch.workHours} 小时；已玩 ${days} 天；已充值 ${ch.rechargeYuan} 元；月卡补给 ${ch.monthlyCardPulls} 抽${upText}。`;
       }
       const active = ch.active;
       els.grindBtn.disabled = !active;
@@ -1036,11 +1031,11 @@
 
     function renderResults(cards) {
       els.cards.innerHTML = '';
-      const featuredFive = cards.find(c => c.rarity === 5 && c.isFeatured);
+      const featuredFiveCount = cards.filter(c => c.rarity === 5 && c.isFeatured).length;
       const offBannerFive = cards.find(c => c.rarity === 5 && !c.isFeatured);
       const hasFour = cards.some(c => c.rarity === 4);
-      els.resultHint.textContent = featuredFive
-        ? '金光出现！本次抽到五星UP'
+      els.resultHint.textContent = featuredFiveCount > 0
+        ? `金光出现！本次抽到 ${featuredFiveCount} 个五星UP`
         : offBannerFive
         ? isFeaturedGuaranteeDisabled()
           ? '出了五星，但这次歪了；大保底已关闭'
@@ -1050,9 +1045,9 @@
         : '本次为三星结果';
 
       if (state.challenge.active) {
-        els.resultHint.textContent += ` ｜ 挑战剩余 ${state.challenge.remaining} 抽`;
-        if (state.challenge.endlessMode && featuredFive) {
-          els.resultHint.textContent += ' ｜ 无尽模式继续挑战';
+        els.resultHint.textContent += ` ｜ 挑战剩余 ${state.challenge.remaining} 抽 ｜ 累计 ${state.challenge.upCount} 个 UP`;
+        if (state.challenge.endlessMode && featuredFiveCount > 0) {
+          els.resultHint.textContent += ' ｜ 继续累计 UP 数';
         }
         if (state.challenge.perverseMode) {
           els.resultHint.textContent += ` ｜ 变态倍率 ${Math.round(getCurrentRateConfig().factor * 100)}%`;
@@ -1107,9 +1102,15 @@
       state.locked = true;
       setDrawButtonsDisabled(true);
 
-      const realCount = state.challenge.active ? Math.min(count, state.challenge.remaining) : count;
+      const maxCount = state.challenge.active ? Math.min(count, state.challenge.remaining) : count;
+      const shouldStopOnFeaturedUP = state.challenge.active && !state.challenge.endlessMode;
       const results = [];
-      for (let i = 0; i < realCount; i++) results.push(drawOne());
+      for (let i = 0; i < maxCount; i++) {
+        const card = drawOne();
+        results.push(card);
+        if (shouldStopOnFeaturedUP && card.rarity === 5 && card.isFeatured) break;
+      }
+      const realCount = results.length;
       if (state.challenge.active) state.challenge.remaining -= realCount;
 
       if (results.some(c => c.rarity === 5)) state.achievements.firstFive = true;
@@ -1119,10 +1120,15 @@
       if (realCount >= 2 && results.filter(c => c.rarity === 5).length >= 2) state.achievements.doubleFiveInTen = true;
       if (results.some(c => c.wasFullPity && c.rarity === 5)) state.achievements.fullPityFive = true;
 
-      if (state.challenge.active && results.some(c => c.rarity === 5 && c.isFeatured)) {
+      const featuredUPCount = results.filter(c => c.rarity === 5 && c.isFeatured).length;
+      if (state.challenge.active && featuredUPCount > 0) {
         const isFirstChallengeUP = !state.challenge.obtainedUP;
         state.challenge.obtainedUP = true;
-        if (isFirstChallengeUP) state.challenge.obtainedUPAt = state.totalPulls;
+        state.challenge.upCount += featuredUPCount;
+        if (isFirstChallengeUP) {
+          const firstUPIndex = results.findIndex(c => c.rarity === 5 && c.isFeatured);
+          state.challenge.obtainedUPAt = state.totalPulls - (realCount - firstUPIndex - 1);
+        }
       }
 
       renderStats();
@@ -1136,6 +1142,8 @@
         setDrawButtonsDisabled(false);
         if (state.challenge.active && state.challenge.obtainedUP && !state.challenge.endlessMode) {
           finishChallenge('up');
+        } else if (state.challenge.active && state.challenge.remaining <= 0) {
+          finishChallenge('complete');
         }
       }, 500 + realCount * 40);
     }
@@ -1161,7 +1169,7 @@
     }
 
     function startChallenge(total) {
-      const endlessMode = state.challengeEndlessMode;
+      const endlessMode = total !== 30;
       const perverseMode = state.challengePerverseMode;
       const disableFeaturedGuarantee = perverseMode && state.challengeDisableFeaturedGuarantee;
       resetSimulationCore();
@@ -1177,17 +1185,6 @@
       renderAchievements();
       renderChallengeStatus();
       els.resultHint.textContent = `已开启 ${total} 抽挑战（${getChallengeConfigText(state.challenge)}）`;
-    }
-
-    function updateChallengeEndlessMode(enabled) {
-      if (state.challenge.active) {
-        els.challengeEndlessToggle.checked = state.challenge.endlessMode;
-        showRechargeToast('挑战中不能改变配置', 1400);
-        return;
-      }
-
-      state.challengeEndlessMode = enabled;
-      renderChallengeStatus();
     }
 
     function updateChallengePerverseMode(enabled) {
@@ -1251,20 +1248,23 @@
       const lines = [];
 
       if (reason === 'up') {
-        lines.push('结果：你在挑战中成功抽到了 UP。');
+        lines.push('结果：你在 30 抽挑战中成功抽到了 UP，挑战已自动终止。');
       } else if (reason === 'manual') {
         lines.push('结果：你主动结束了这次挑战。');
+      } else if (ch.upCount > 0) {
+        lines.push(`结果：挑战抽数已经用完，本次总共抽到了 ${ch.upCount} 个 UP。`);
       } else {
         lines.push('结果：挑战抽数已经耗尽，本次仍未抽到 UP。');
       }
 
-      lines.push(`挑战模式：${ch.endlessMode ? '无尽模式，抽到 UP 后由你主动决定何时结束。' : '普通模式，抽到 UP 后自动结算。'}`);
+      lines.push(`挑战模式：${ch.total} 抽，${ch.endlessMode ? '抽到 UP 不会中断，会继续统计 UP 总数。' : '抽到 UP 后自动结算。'}`);
       if (ch.perverseMode) {
         lines.push(`变态模式：已开启。当前基础概率倍率约为 ${Math.round(getPerverseRateFactor(ch.workHours) * 100)}%，${ch.disableFeaturedGuarantee ? '大保底机制已关闭' : '大保底机制保留'}。`);
       } else {
         lines.push('变态模式：未开启，基础概率保持正常。');
       }
       lines.push(`本次总共抽了 ${usedPulls} 抽。`);
+      lines.push(`本次一共出了 ${ch.upCount} 个 UP。`);
       lines.push(`其中你通过爆肝获得了 ${workPulls} 抽，共爆肝 ${ch.workHours} 小时。`);
       lines.push(`按每天最多爆肝 4 小时计算，你大约玩了 ${days} 天。`);
       lines.push(`你通过充值补进了 ${ch.rechargePulls} 抽，共花费 ${ch.rechargeYuan} 元。`);
@@ -1431,7 +1431,7 @@
       ctx.stroke();
       ctx.fillStyle = '#eef2ff';
       ctx.font = '800 24px "Microsoft YaHei", "PingFang SC", sans-serif';
-      ctx.fillText(state.challenge.obtainedUP ? 'UP 已到手' : '本次未到手', 288, 256);
+      ctx.fillText(state.challenge.upCount > 0 ? `UP ×${state.challenge.upCount}` : '本次未到手', 288, 256);
 
       drawRoundRect(ctx, 540, 222, 196, 52, 26);
       ctx.fillStyle = state.challenge.endlessMode ? 'rgba(255,227,155,0.20)' : 'rgba(157,217,255,0.18)';
@@ -1441,7 +1441,7 @@
       ctx.stroke();
       ctx.fillStyle = '#eef2ff';
       ctx.font = '800 24px "Microsoft YaHei", "PingFang SC", sans-serif';
-      ctx.fillText(state.challenge.endlessMode ? '无尽模式' : '普通模式', 566, 256);
+      ctx.fillText(state.challenge.endlessMode ? '不中断' : '自动终止', 566, 256);
 
       drawRoundRect(ctx, 754, 222, 248, 52, 26);
       ctx.fillStyle = state.challenge.perverseMode ? 'rgba(255,95,109,0.20)' : 'rgba(142,240,192,0.16)';
@@ -1461,7 +1461,7 @@
 
       const statItems = [
         ['总抽数', `${state.totalPulls} 抽`],
-        ['五星数量', `${state.fiveCount} 个`],
+        ['UP 数量', `${state.challenge.upCount} 个`],
         ['爆肝时间', `${state.challenge.workHours} 小时`],
         ['充值花费', `${state.challenge.rechargeYuan} 元`]
       ];
@@ -1663,10 +1663,9 @@
     els.tenBtn.addEventListener('click', () => doPull(10));
     els.mobileSingleBtn.addEventListener('click', () => doPull(1));
     els.mobileTenBtn.addEventListener('click', () => doPull(10));
-    els.challenge10Btn.addEventListener('click', () => startChallenge(10));
-    els.challenge20Btn.addEventListener('click', () => startChallenge(20));
     els.challenge30Btn.addEventListener('click', () => startChallenge(30));
-    els.challengeEndlessToggle.addEventListener('change', () => updateChallengeEndlessMode(els.challengeEndlessToggle.checked));
+    els.challenge100Btn.addEventListener('click', () => startChallenge(100));
+    els.challenge200Btn.addEventListener('click', () => startChallenge(200));
     els.challengePerverseToggle.addEventListener('change', () => updateChallengePerverseMode(els.challengePerverseToggle.checked));
     els.challengeDisableGuaranteeToggle.addEventListener('change', () => updateChallengeDisableFeaturedGuarantee(els.challengeDisableGuaranteeToggle.checked));
     els.grindBtn.addEventListener('click', addGrindHour);
