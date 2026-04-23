@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>抽卡模拟器</title>
+  <style>
+    :root {
+      --bg1: #0f1221;
+      --bg2: #1a2040;
+      --panel: rgba(255,255,255,0.08);
+      --text: #eef2ff;
+      --muted: #b5bedb;
+      --shadow: 0 10px 30px rgba(0,0,0,0.28);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(181,124,255,0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(255,209,102,0.16), transparent 25%),
+        linear-gradient(135deg, var(--bg1), var(--bg2));
+      overflow-x: hidden;
+    }
+    .container {
+      width: min(1160px, calc(100% - 24px));
+      margin: 24px auto 36px;
+    }
+    .hero, .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius);
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 22px 22px 18px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 4vw, 38px);
+      line-height: 1.1;
+    }
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+    }
+    .panel { padding: 18px; }
+    .controls { display: grid; gap: 14px; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .stat {
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .buttons, .challenge-buttons, .resource-grid, .recharge-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .buttons { grid-template-columns: 1fr 1fr; margin-top: 14px; }
+    .challenge-buttons { grid-template-columns: repeat(3, 1fr); }
+    .resource-grid { grid-template-columns: 1fr 1fr; }
+    .recharge-grid { grid-template-columns: repeat(2, 1fr); }
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #101526;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+    }
+    button:hover:not(:disabled) { transform: translateY(-2px); }
+    button:active:not(:disabled) { transform: translateY(0); }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+    .single-btn { background: linear-gradient(135deg, #9dd9ff, #66b3ff); }
+    .ten-btn { background: linear-gradient(135deg, #ffe08c, #ffbe55); }
+    .reset-btn {
+      background: linear-gradient(135deg, #ef9a9a, #ff7676);
+      width: 100%;
+      margin-top: 10px;
+    }
+    .challenge-btn {
+      background: linear-gradient(135deg, #c5b3ff, #8d7bff);
+      color: #101526;
+      padding: 11px 8px;
+      font-size: 13px;
+    }
+    .challenge-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 10px 0;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+    }
+    .challenge-toggle-text {
+      display: grid;
+      gap: 3px;
+    }
+    .challenge-toggle-title {
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .challenge-toggle-desc {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .challenge-toggle input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .switch-visual {
+      position: relative;
+      flex: 0 0 auto;
+      width: 48px;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(181,190,219,0.22);
+      border: 1px solid rgba(255,255,255,0.16);
+      transition: background 0.18s ease, border-color 0.18s ease;
+    }
+    .switch-visual::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #eef2ff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .challenge-toggle input:checked + .switch-visual {
+      background: linear-gradient(135deg, #ffe39b, #ff8c5c);
+      border-color: rgba(255,227,155,0.75);
+    }
+    .challenge-toggle input:checked + .switch-visual::after {
+      transform: translateX(20px);
+      background: #2b1800;
+    }
+    .challenge-toggle.sub-toggle {
+      margin-top: -2px;
+      margin-left: 12px;
+      background: rgba(255,255,255,0.04);
+    }
+    .challenge-toggle.danger-toggle input:checked + .switch-visual {
+      background: linear-gradient(135deg, #ffb199, #ff5f6d);
+      border-color: rgba(255,177,153,0.75);
+    }
+    .challenge-toggle.config-locked {
+      cursor: not-allowed;
+      opacity: 0.62;
+    }
+    .challenge-toggle input:disabled + .switch-visual {
+      opacity: 0.65;
+    }
+    .resource-btn {
+      background: linear-gradient(135deg, #8ef0c0, #57c893);
+      color: #0f1a1a;
+      font-size: 13px;
+      padding: 12px 8px;
+    }
+    .end-btn {
+      background: linear-gradient(135deg, #ffd8a8, #ff9f68);
+      color: #3d1f00;
+      font-size: 13px;
+      padding: 12px 8px;
+      grid-column: 1 / -1;
+    }
+    .recharge-btn {
+      background: linear-gradient(135deg, #ffd6f2, #ff9bd0);
+      color: #3a1230;
+      font-size: 13px;
+      padding: 12px 8px;
+    }
+    .small-note, .section-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .section-title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 800;
+    }
+    .banner {
+      position: relative;
+      overflow: hidden;
+      min-height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .banner::before {
+      content: "";
+      position: absolute;
+      inset: -20%;
+      background:
+        radial-gradient(circle at 30% 40%, rgba(255,255,255,0.08), transparent 20%),
+        radial-gradient(circle at 70% 30%, rgba(255,209,102,0.1), transparent 18%),
+        radial-gradient(circle at 60% 70%, rgba(181,124,255,0.12), transparent 22%);
+      animation: drift 8s linear infinite alternate;
+    }
+    @keyframes drift {
+      from { transform: translate3d(-10px, -6px, 0) scale(1); }
+      to { transform: translate3d(12px, 10px, 0) scale(1.04); }
+    }
+    .banner-text {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 22px;
+    }
+    .banner-text h2 {
+      margin: 0 0 8px;
+      font-size: clamp(24px, 4vw, 34px);
+    }
+    .banner-text p { margin: 0; color: var(--muted); }
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .results-title {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .results-subtitle { color: var(--muted); font-size: 13px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      min-height: 120px;
+    }
+    .card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 18px;
+      padding: 14px;
+      min-height: 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid rgba(255,255,255,0.12);
+      transform: translateY(12px) scale(0.96);
+      opacity: 0;
+      animation: reveal 0.42s ease forwards;
+    }
+    @keyframes reveal { to { transform: translateY(0) scale(1); opacity: 1; } }
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 20%, rgba(255,255,255,0.16) 50%, transparent 80%);
+      transform: translateX(-140%);
+      animation: shine 1.2s ease;
+    }
+    @keyframes shine { to { transform: translateX(140%); } }
+    .rarity-3 {
+      background: linear-gradient(160deg, rgba(58,119,199,0.95), rgba(34,60,115,0.96));
+      box-shadow: 0 10px 22px rgba(78,133,220,0.24);
+    }
+    .rarity-4 {
+      background: linear-gradient(160deg, rgba(140,91,223,0.96), rgba(81,43,142,0.98));
+      box-shadow: 0 10px 22px rgba(181,124,255,0.26);
+    }
+    .rarity-5 {
+      background: linear-gradient(160deg, rgba(255,198,88,0.98), rgba(182,112,24,0.98));
+      box-shadow: 0 12px 28px rgba(255,209,102,0.35);
+    }
+    .stars {
+      font-size: 18px;
+      letter-spacing: 2px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .card-name {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.15;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    }
+    .tag {
+      align-self: flex-start;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    .history, .achievements, .challenge-box, .recharge-box {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .history h3, .achievements h3, .challenge-box h3, .recharge-box h3 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .history-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-height: 140px;
+      overflow: auto;
+    }
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.06);
+    }
+    .pill.r3 { color: #d9ebff; }
+    .pill.r4 { color: #f0ddff; }
+    .pill.r5 { color: #fff4cf; }
+    .achievement-list {
+      display: grid;
+      gap: 8px;
+    }
+    .achievement {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      opacity: 0.55;
+      transition: transform 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
+    }
+    .achievement.unlocked {
+      opacity: 1;
+      border-color: rgba(255,209,102,0.45);
+      background: linear-gradient(135deg, rgba(255,209,102,0.12), rgba(255,255,255,0.06));
+      transform: translateY(-1px);
+    }
+    .achievement-title {
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .achievement-desc {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .challenge-status {
+      margin: 8px 0 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .flash { animation: pulse 0.5s ease; }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      45% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+    .mobile-action-bar {
+      display: none;
+      position: fixed;
+      left: 10px;
+      right: 10px;
+      bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      z-index: 50;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 16px;
+      background: rgba(15,18,33,0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.34);
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(5,8,18,0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 80;
+    }
+    .modal.show { display: flex; }
+    .modal-card {
+      width: min(640px, 100%);
+      background: rgba(20,25,48,0.96);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    }
+    .modal-card h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+    .report-body {
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 14px;
+      white-space: pre-line;
+    }
+    .report-actions {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 10px;
+    }
+    .save-report-btn {
+      width: 100%;
+      color: #291800;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.55), transparent 28%),
+        linear-gradient(135deg, #ffe39b, #ffbd55 48%, #ff8c5c);
+    }
+    .close-modal-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #9dd9ff, #66b3ff);
+    }
+    .toast {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.92);
+      min-width: 240px;
+      max-width: calc(100vw - 32px);
+      padding: 20px 28px;
+      border-radius: 18px;
+      background: rgba(20,25,48,0.98);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 20px 48px rgba(0,0,0,0.36);
+      color: var(--text);
+      font-size: 24px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 0.5px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 95;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    @media (max-width: 900px) {
+      .container {
+        width: min(100%, calc(100% - 12px));
+        margin: 10px auto 16px;
+      }
+      .hero {
+        padding: 12px 12px 10px;
+        margin-bottom: 8px;
+      }
+      .subtitle {
+        font-size: 12px;
+        margin-top: 6px;
+      }
+      .layout {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .results-panel { order: 1; }
+      .controls { order: 2; }
+      .panel {
+        padding: 12px;
+        border-radius: 14px;
+      }
+      .controls { gap: 10px; }
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .stat {
+        padding: 9px;
+        border-radius: 12px;
+      }
+      .stat-label {
+        font-size: 11px;
+        margin-bottom: 4px;
+      }
+      .stat-value { font-size: 17px; }
+      .buttons { display: none; }
+      .mobile-action-bar { display: grid; }
+      button {
+        padding: 12px;
+        font-size: 14px;
+        border-radius: 12px;
+      }
+      .challenge-btn, .resource-btn, .recharge-btn, .end-btn {
+        font-size: 12px;
+        padding: 10px 6px;
+      }
+      .small-note, .section-note {
+        font-size: 11px;
+        line-height: 1.45;
+        margin-top: 4px;
+      }
+      .banner { min-height: 96px; }
+      .banner-text { padding: 12px; }
+      .banner-text h2 {
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+      .banner-text p { font-size: 12px; }
+      .results-header { margin-bottom: 8px; }
+      .results-title { font-size: 17px; }
+      .results-subtitle { font-size: 12px; }
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        min-height: 80px;
+      }
+      .card {
+        min-height: 108px;
+        padding: 10px;
+        border-radius: 14px;
+      }
+      .stars {
+        font-size: 15px;
+        letter-spacing: 1px;
+      }
+      .card-name { font-size: 16px; }
+      .tag {
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+      .history, .achievements, .challenge-box, .recharge-box {
+        margin-top: 10px;
+        padding-top: 10px;
+      }
+      .history h3, .achievements h3, .challenge-box h3, .recharge-box h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      .achievement { padding: 8px 10px; }
+      .achievement-title { font-size: 12px; }
+      .achievement-desc { font-size: 11px; }
+      .challenge-status { font-size: 11px; padding: 8px 10px; }
+      .history-list { max-height: 92px; }
+      .challenge-buttons, .resource-grid, .recharge-grid {
+        gap: 6px;
+      }
+      .report-actions {
+        grid-template-columns: 1fr;
+      }
+      body { padding-bottom: 96px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>抽卡模拟器</h1>
+      <div class="subtitle">单抽 / 十连｜小保底｜挑战模式｜充值与爆肝对比｜轻量成就系统</div>
+    </section>
+
+    <div class="layout">
+      <section class="panel controls">
+        <div>
+          <div class="stat-label">当前规则</div>
+          <div class="small-note">
+            五星 0.6%，四星 5.1%，其余三星。<br>
+            内置 90 抽五星保底、10 抽四星保底。<br>
+            五星加入小保底：首次五星 50% 为 UP，歪后下一个五星必为 UP。
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-label">总抽数</div>
+            <div class="stat-value" id="totalPulls">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">五星数</div>
+            <div class="stat-value" id="fiveCount">0</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">距五星保底</div>
+            <div class="stat-value" id="fivePity">90</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">距四星保底</div>
+            <div class="stat-value" id="fourPity">10</div>
+          </div>
+          <div class="stat" style="grid-column: 1 / -1;">
+            <div class="stat-label">当前五星状态</div>
+            <div class="stat-value" id="featuredState" style="font-size:18px;">小保底</div>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="single-btn" id="singleBtn">单抽 ×1</button>
+          <button class="ten-btn" id="tenBtn">十连 ×10</button>
+        </div>
+
+        <button class="reset-btn" id="resetBtn">重置记录</button>
+
+        <div class="challenge-box">
+          <h3>挑战入口</h3>
+          <div class="challenge-status" id="challengeStatus">未开启挑战。可选 10 抽、20 抽、30 抽挑战。挑战会从全新状态开始，UP 到手或主动结束时会弹出总结报告。</div>
+          <div class="challenge-buttons">
+            <button class="challenge-btn" id="challenge10Btn">10 抽挑战</button>
+            <button class="challenge-btn" id="challenge20Btn">20 抽挑战</button>
+            <button class="challenge-btn" id="challenge30Btn">30 抽挑战</button>
+          </div>
+          <label class="challenge-toggle" id="challengeEndlessLabel">
+            <span class="challenge-toggle-text">
+              <span class="challenge-toggle-title">无尽模式</span>
+              <span class="challenge-toggle-desc">开启后抽到 UP 不自动结算，只能主动结束挑战。</span>
+            </span>
+            <input type="checkbox" id="challengeEndlessToggle">
+            <span class="switch-visual" aria-hidden="true"></span>
+          </label>
+          <label class="challenge-toggle" id="challengePerverseLabel">
+            <span class="challenge-toggle-text">
+              <span class="challenge-toggle-title">变态模式</span>
+              <span class="challenge-toggle-desc">只在挑战内生效：每爆肝 1 小时，基础五星/四星概率降低 5%，最低降到 20%。</span>
+            </span>
+            <input type="checkbox" id="challengePerverseToggle">
+            <span class="switch-visual" aria-hidden="true"></span>
+          </label>
+          <label class="challenge-toggle sub-toggle danger-toggle" id="challengeDisableGuaranteeLabel">
+            <span class="challenge-toggle-text">
+              <span class="challenge-toggle-title">关闭大保底机制</span>
+              <span class="challenge-toggle-desc">变态模式附加配置：歪了也不会进入下一次必中 UP。</span>
+            </span>
+            <input type="checkbox" id="challengeDisableGuaranteeToggle">
+            <span class="switch-visual" aria-hidden="true"></span>
+          </label>
+        </div>
+
+        <div class="recharge-box">
+          <h3>挑战资源</h3>
+          <div class="section-title">爆肝入口</div>
+          <div class="resource-grid">
+            <button class="resource-btn" id="grindBtn">爆肝一小时｜+5 抽</button>
+            <button class="resource-btn" id="monthlyBtn">30 块月卡｜+18 抽</button>
+          </div>
+          <div class="section-note" style="margin-top:8px;">月卡视为上个月已经积累完成，不计入这次挑战的时间成本。</div>
+
+          <div class="section-title" style="margin-top:12px;">充值入口</div>
+          <div class="recharge-grid">
+            <button class="recharge-btn" data-yuan="6" data-pulls="1">6 充值｜+1 抽</button>
+            <button class="recharge-btn" data-yuan="68" data-pulls="6">68 充值｜+6 抽</button>
+            <button class="recharge-btn" data-yuan="128" data-pulls="11">128 充值｜+11 抽</button>
+            <button class="recharge-btn" data-yuan="198" data-pulls="17">198 充值｜+17 抽</button>
+            <button class="recharge-btn" data-yuan="328" data-pulls="28">328 充值｜+28 抽</button>
+            <button class="recharge-btn" data-yuan="648" data-pulls="56">648 充值｜+56 抽</button>
+          </div>
+          <div class="resource-grid" style="margin-top:10px;">
+            <button class="end-btn" id="endChallengeBtn">主动结束挑战</button>
+          </div>
+        </div>
+
+        <div class="history">
+          <h3>最近记录</h3>
+          <div class="history-list" id="historyList"></div>
+        </div>
+
+        <div class="achievements">
+          <h3>成就墙（按难度排序）</h3>
+          <div class="achievement-list" id="achievementList"></div>
+        </div>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="banner" id="banner">
+          <div class="banner-text">
+            <h2>点击开始抽卡</h2>
+            <p>金色 = 五星，紫色 = 四星，蓝色 = 三星</p>
+          </div>
+        </div>
+
+        <div class="results-header">
+          <div>
+            <div class="results-title">本次结果</div>
+            <div class="results-subtitle" id="resultHint">等待你的第一发</div>
+          </div>
+        </div>
+
+        <div class="cards" id="cards"></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="mobile-action-bar">
+    <button class="single-btn" id="mobileSingleBtn">单抽 ×1</button>
+    <button class="ten-btn" id="mobileTenBtn">十连 ×10</button>
+  </div>
+
+  <div class="modal" id="reportModal">
+    <div class="modal-card">
+      <h3>挑战总结报告</h3>
+      <div class="report-body" id="reportBody"></div>
+      <div class="report-actions">
+        <button class="save-report-btn" id="saveReportImageBtn">保存报告图片</button>
+        <button class="close-modal-btn" id="closeModalBtn">收起报告</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="rechargeToast"></div>
+
+  <script>
+    const YUAN_PER_PULL_BENCHMARK = 648 / 56;
+    const BASE_FIVE_RATE = 0.006;
+    const BASE_FOUR_RATE = 0.051;
+    const PERVERSE_RATE_DROP_PER_HOUR = 0.05;
+    const PERVERSE_MIN_RATE_FACTOR = 0.2;
+
+    const pool = {
+      featured5: ["曜金圣痕"],
+      standard5: ["天穹巡礼", "月蚀终章", "星海裁决"],
+      4: ["霜羽", "夜灯", "苍岚", "铃语", "流火", "白汐"],
+      3: ["短弓", "长枪", "旧剑", "木杖", "旅人书", "训练刃", "猎弩", "铸铁枪"]
+    };
+
+    function emptyChallenge() {
+      return {
+        active: false,
+        total: 0,
+        remaining: 0,
+        workHours: 0,
+        rechargeYuan: 0,
+        rechargePulls: 0,
+        monthlyCardPulls: 0,
+        usedMonthlyCard: false,
+        endlessMode: false,
+        perverseMode: false,
+        disableFeaturedGuarantee: false,
+        obtainedUP: false,
+        obtainedUPAt: 0
+      };
+    }
+
+    const state = {
+      totalPulls: 0,
+      fiveCount: 0,
+      pity5: 0,
+      pity4: 0,
+      guaranteedFeatured5: false,
+      locked: false,
+      history: [],
+      achievements: {
+        firstFive: false,
+        firstFeatured: false,
+        singleFive: false,
+        doubleFourInTen: false,
+        doubleFiveInTen: false,
+        fullPityFive: false
+      },
+      challengeEndlessMode: false,
+      challengePerverseMode: false,
+      challengeDisableFeaturedGuarantee: false,
+      challenge: emptyChallenge()
+    };
+
+    const els = {
+      totalPulls: document.getElementById('totalPulls'),
+      fiveCount: document.getElementById('fiveCount'),
+      fivePity: document.getElementById('fivePity'),
+      fourPity: document.getElementById('fourPity'),
+      featuredState: document.getElementById('featuredState'),
+      cards: document.getElementById('cards'),
+      resultHint: document.getElementById('resultHint'),
+      historyList: document.getElementById('historyList'),
+      achievementList: document.getElementById('achievementList'),
+      challengeStatus: document.getElementById('challengeStatus'),
+      singleBtn: document.getElementById('singleBtn'),
+      tenBtn: document.getElementById('tenBtn'),
+      mobileSingleBtn: document.getElementById('mobileSingleBtn'),
+      mobileTenBtn: document.getElementById('mobileTenBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      challenge10Btn: document.getElementById('challenge10Btn'),
+      challenge20Btn: document.getElementById('challenge20Btn'),
+      challenge30Btn: document.getElementById('challenge30Btn'),
+      challengeEndlessLabel: document.getElementById('challengeEndlessLabel'),
+      challengeEndlessToggle: document.getElementById('challengeEndlessToggle'),
+      challengePerverseLabel: document.getElementById('challengePerverseLabel'),
+      challengePerverseToggle: document.getElementById('challengePerverseToggle'),
+      challengeDisableGuaranteeLabel: document.getElementById('challengeDisableGuaranteeLabel'),
+      challengeDisableGuaranteeToggle: document.getElementById('challengeDisableGuaranteeToggle'),
+      grindBtn: document.getElementById('grindBtn'),
+      monthlyBtn: document.getElementById('monthlyBtn'),
+      endChallengeBtn: document.getElementById('endChallengeBtn'),
+      rechargeBtns: Array.from(document.querySelectorAll('.recharge-btn')),
+      banner: document.getElementById('banner'),
+      reportModal: document.getElementById('reportModal'),
+      reportBody: document.getElementById('reportBody'),
+      saveReportImageBtn: document.getElementById('saveReportImageBtn'),
+      closeModalBtn: document.getElementById('closeModalBtn'),
+      rechargeToast: document.getElementById('rechargeToast')
+    };
+
+    function randItem(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function starText(rarity) {
+      return '★'.repeat(rarity);
+    }
+
+    function rarityTag(rarity, isFeatured = false) {
+      if (rarity === 5) return isFeatured ? '五星UP' : '五星常驻';
+      return rarity === 4 ? '四星' : '三星';
+    }
+
+    function getPerverseRateFactor(workHours) {
+      return Math.max(PERVERSE_MIN_RATE_FACTOR, 1 - workHours * PERVERSE_RATE_DROP_PER_HOUR);
+    }
+
+    function getCurrentRateConfig() {
+      const ch = state.challenge;
+      const factor = ch.active && ch.perverseMode ? getPerverseRateFactor(ch.workHours) : 1;
+
+      return {
+        factor,
+        fiveRate: BASE_FIVE_RATE * factor,
+        fourRate: BASE_FOUR_RATE * factor
+      };
+    }
+
+    function isFeaturedGuaranteeDisabled() {
+      const ch = state.challenge;
+      return ch.active && ch.perverseMode && ch.disableFeaturedGuarantee;
+    }
+
+    function drawOne() {
+      state.totalPulls += 1;
+      state.pity5 += 1;
+      state.pity4 += 1;
+      const wasFullPity = state.pity5 >= 90;
+      const rates = getCurrentRateConfig();
+
+      let rarity;
+      if (state.pity5 >= 90) {
+        rarity = 5;
+      } else if (state.pity4 >= 10) {
+        rarity = Math.random() < (rates.fiveRate / (BASE_FIVE_RATE + BASE_FOUR_RATE)) ? 5 : 4;
+      } else {
+        const r = Math.random();
+        if (r < rates.fiveRate) rarity = 5;
+        else if (r < rates.fiveRate + rates.fourRate) rarity = 4;
+        else rarity = 3;
+      }
+
+      let isFeatured = false;
+      let name;
+      const disableFeaturedGuarantee = isFeaturedGuaranteeDisabled();
+
+      if (rarity === 5) {
+        state.fiveCount += 1;
+        state.pity5 = 0;
+        state.pity4 = 0;
+        if (state.guaranteedFeatured5 && !disableFeaturedGuarantee) {
+          isFeatured = true;
+          name = randItem(pool.featured5);
+          state.guaranteedFeatured5 = false;
+        } else if (Math.random() < 0.5) {
+          isFeatured = true;
+          name = randItem(pool.featured5);
+          state.guaranteedFeatured5 = false;
+        } else {
+          name = randItem(pool.standard5);
+          state.guaranteedFeatured5 = !disableFeaturedGuarantee;
+        }
+      } else if (rarity === 4) {
+        state.pity4 = 0;
+        name = randItem(pool[4]);
+      } else {
+        name = randItem(pool[3]);
+      }
+
+      const card = {
+        rarity,
+        isFeatured,
+        name,
+        wasFullPity,
+        id: `${Date.now()}-${Math.random()}`
+      };
+
+      state.history.unshift(card);
+      state.history = state.history.slice(0, 30);
+      return card;
+    }
+
+    function renderStats() {
+      els.totalPulls.textContent = state.totalPulls;
+      els.fiveCount.textContent = state.fiveCount;
+      els.fivePity.textContent = Math.max(0, 90 - state.pity5);
+      els.fourPity.textContent = Math.max(0, 10 - state.pity4);
+      els.featuredState.textContent = isFeaturedGuaranteeDisabled()
+        ? '大保底关闭'
+        : state.guaranteedFeatured5 ? '大保底' : '小保底';
+    }
+
+    function renderHistory() {
+      els.historyList.innerHTML = '';
+      if (state.history.length === 0) {
+        els.historyList.innerHTML = '<div class="pill">暂无记录</div>';
+        return;
+      }
+      state.history.forEach(item => {
+        const pill = document.createElement('div');
+        pill.className = `pill r${item.rarity}`;
+        pill.textContent = `${starText(item.rarity)} ${item.name}${item.rarity === 5 ? (item.isFeatured ? ' · UP' : ' · 歪') : ''}`;
+        els.historyList.appendChild(pill);
+      });
+    }
+
+    function renderAchievements() {
+      const items = [
+        { key: 'doubleFiveInTen', title: '十连双金', desc: '一次十连中出现两个五星' },
+        { key: 'singleFive', title: '一发入魂', desc: '单抽直接出五星' },
+        { key: 'fullPityFive', title: '保底战神', desc: '恰好在五星保底抽出五星' },
+        { key: 'firstFeatured', title: '命定之人', desc: '首次抽到五星 UP' },
+        { key: 'doubleFourInTen', title: '十连出双紫', desc: '一次十连中出现至少两个四星或以上' },
+        { key: 'firstFive', title: '初见金光', desc: '累计抽到第一个五星' }
+      ];
+      els.achievementList.innerHTML = '';
+      items.forEach(item => {
+        const node = document.createElement('div');
+        node.className = `achievement ${state.achievements[item.key] ? 'unlocked' : ''}`;
+        node.innerHTML = `
+          <div class="achievement-title">${state.achievements[item.key] ? '🏆 ' : '🔒 '}${item.title}</div>
+          <div class="achievement-desc">${item.desc}</div>
+        `;
+        els.achievementList.appendChild(node);
+      });
+    }
+
+    function getChallengeConfigText(ch = state.challenge) {
+      const endlessText = ch.endlessMode ? '无尽模式' : '普通模式';
+      const perverseText = ch.perverseMode
+        ? `变态模式开启，概率倍率 ${Math.round(getPerverseRateFactor(ch.workHours) * 100)}%，${ch.disableFeaturedGuarantee ? '大保底关闭' : '大保底保留'}`
+        : '变态模式关闭';
+
+      return `${endlessText}；${perverseText}`;
+    }
+
+    function getPendingChallengeConfigText() {
+      const endlessText = state.challengeEndlessMode ? '无尽模式' : '普通模式';
+      const perverseText = state.challengePerverseMode
+        ? `变态模式开启，初始概率倍率 100%，${state.challengeDisableFeaturedGuarantee ? '大保底关闭' : '大保底保留'}`
+        : '变态模式关闭';
+
+      return `${endlessText}；${perverseText}`;
+    }
+
+    function renderChallengeConfigControls() {
+      const active = state.challenge.active;
+      const endlessMode = active ? state.challenge.endlessMode : state.challengeEndlessMode;
+      const perverseMode = active ? state.challenge.perverseMode : state.challengePerverseMode;
+      const disableGuarantee = active ? state.challenge.disableFeaturedGuarantee : state.challengeDisableFeaturedGuarantee;
+
+      els.challengeEndlessToggle.checked = endlessMode;
+      els.challengePerverseToggle.checked = perverseMode;
+      els.challengeDisableGuaranteeToggle.checked = disableGuarantee;
+      els.challengeEndlessToggle.disabled = active;
+      els.challengePerverseToggle.disabled = active;
+      els.challengeDisableGuaranteeToggle.disabled = active || !perverseMode;
+      els.challengeEndlessLabel.classList.toggle('config-locked', active);
+      els.challengePerverseLabel.classList.toggle('config-locked', active);
+      els.challengeDisableGuaranteeLabel.classList.toggle('config-locked', active || !perverseMode);
+    }
+
+    function renderChallengeStatus() {
+      const ch = state.challenge;
+      renderChallengeConfigControls();
+      if (!ch.active) {
+        els.challengeStatus.textContent = `未开启挑战。可选 10 抽、20 抽、30 抽挑战。当前配置：${getPendingChallengeConfigText()}。`;
+      } else if (ch.remaining > 0) {
+        const days = ch.workHours === 0 ? 0 : Math.ceil(ch.workHours / 4);
+        const upText = ch.obtainedUP ? '；UP 已到手' : '';
+        els.challengeStatus.textContent = `挑战进行中（${getChallengeConfigText(ch)}）：剩余 ${ch.remaining} 抽；已爆肝 ${ch.workHours} 小时；已玩 ${days} 天；已充值 ${ch.rechargeYuan} 元；月卡补给 ${ch.monthlyCardPulls} 抽${upText}。`;
+      } else {
+        const days = ch.workHours === 0 ? 0 : Math.ceil(ch.workHours / 4);
+        const upText = ch.obtainedUP ? '；UP 已到手' : '';
+        els.challengeStatus.textContent = `挑战抽数已经用完（${getChallengeConfigText(ch)}）：已爆肝 ${ch.workHours} 小时；已玩 ${days} 天；已充值 ${ch.rechargeYuan} 元；月卡补给 ${ch.monthlyCardPulls} 抽${upText}。你现在可以选择充值、爆肝，或者主动结束挑战。`;
+      }
+      const active = ch.active;
+      els.grindBtn.disabled = !active;
+      els.monthlyBtn.disabled = !active || ch.usedMonthlyCard;
+      els.endChallengeBtn.disabled = !active;
+      els.rechargeBtns.forEach(btn => btn.disabled = !active);
+    }
+
+    function renderResults(cards) {
+      els.cards.innerHTML = '';
+      const featuredFive = cards.find(c => c.rarity === 5 && c.isFeatured);
+      const offBannerFive = cards.find(c => c.rarity === 5 && !c.isFeatured);
+      const hasFour = cards.some(c => c.rarity === 4);
+      els.resultHint.textContent = featuredFive
+        ? '金光出现！本次抽到五星UP'
+        : offBannerFive
+        ? isFeaturedGuaranteeDisabled()
+          ? '出了五星，但这次歪了；大保底已关闭'
+          : '出了五星，但这次歪了，已进入大保底'
+        : hasFour
+        ? '本次至少拿到四星'
+        : '本次为三星结果';
+
+      if (state.challenge.active) {
+        els.resultHint.textContent += ` ｜ 挑战剩余 ${state.challenge.remaining} 抽`;
+        if (state.challenge.endlessMode && featuredFive) {
+          els.resultHint.textContent += ' ｜ 无尽模式继续挑战';
+        }
+        if (state.challenge.perverseMode) {
+          els.resultHint.textContent += ` ｜ 变态倍率 ${Math.round(getCurrentRateConfig().factor * 100)}%`;
+        }
+      }
+
+      cards.forEach((card, index) => {
+        const node = document.createElement('div');
+        node.className = `card rarity-${card.rarity}`;
+        node.style.animationDelay = `${index * 0.06}s`;
+        node.innerHTML = `
+          <div class="stars">${starText(card.rarity)}</div>
+          <div class="card-name">${card.name}</div>
+          <div class="tag">${rarityTag(card.rarity, card.isFeatured)}</div>
+        `;
+        els.cards.appendChild(node);
+      });
+
+      els.banner.classList.remove('flash');
+      void els.banner.offsetWidth;
+      els.banner.classList.add('flash');
+    }
+
+    function setDrawButtonsDisabled(disabled) {
+      els.singleBtn.disabled = disabled;
+      els.tenBtn.disabled = disabled;
+      els.mobileSingleBtn.disabled = disabled;
+      els.mobileTenBtn.disabled = disabled;
+    }
+
+    let toastTimer = null;
+    function showRechargeToast(message, duration = 1000) {
+      els.rechargeToast.textContent = message;
+      els.rechargeToast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        els.rechargeToast.classList.remove('show');
+      }, duration);
+    }
+
+    function refreshAfterResourceChange(message = '') {
+      renderStats();
+      renderChallengeStatus();
+      if (state.challenge.active) {
+        els.resultHint.textContent = message || `挑战当前可用 ${state.challenge.remaining} 抽`;
+      }
+    }
+
+    function doPull(count) {
+      if (state.locked) return;
+      if (state.challenge.active && state.challenge.remaining <= 0) return;
+      state.locked = true;
+      setDrawButtonsDisabled(true);
+
+      const realCount = state.challenge.active ? Math.min(count, state.challenge.remaining) : count;
+      const results = [];
+      for (let i = 0; i < realCount; i++) results.push(drawOne());
+      if (state.challenge.active) state.challenge.remaining -= realCount;
+
+      if (results.some(c => c.rarity === 5)) state.achievements.firstFive = true;
+      if (results.some(c => c.rarity === 5 && c.isFeatured)) state.achievements.firstFeatured = true;
+      if (realCount === 1 && results.some(c => c.rarity === 5)) state.achievements.singleFive = true;
+      if (realCount >= 2 && results.filter(c => c.rarity >= 4).length >= 2) state.achievements.doubleFourInTen = true;
+      if (realCount >= 2 && results.filter(c => c.rarity === 5).length >= 2) state.achievements.doubleFiveInTen = true;
+      if (results.some(c => c.wasFullPity && c.rarity === 5)) state.achievements.fullPityFive = true;
+
+      if (state.challenge.active && results.some(c => c.rarity === 5 && c.isFeatured)) {
+        const isFirstChallengeUP = !state.challenge.obtainedUP;
+        state.challenge.obtainedUP = true;
+        if (isFirstChallengeUP) state.challenge.obtainedUPAt = state.totalPulls;
+      }
+
+      renderStats();
+      renderHistory();
+      renderAchievements();
+      renderChallengeStatus();
+      renderResults(results);
+
+      setTimeout(() => {
+        state.locked = false;
+        setDrawButtonsDisabled(false);
+        if (state.challenge.active && state.challenge.obtainedUP && !state.challenge.endlessMode) {
+          finishChallenge('up');
+        }
+      }, 500 + realCount * 40);
+    }
+
+    function resetSimulationCore() {
+      state.totalPulls = 0;
+      state.fiveCount = 0;
+      state.pity5 = 0;
+      state.pity4 = 0;
+      state.guaranteedFeatured5 = false;
+      state.locked = false;
+      state.history = [];
+      state.achievements = {
+        firstFive: false,
+        firstFeatured: false,
+        singleFive: false,
+        doubleFourInTen: false,
+        doubleFiveInTen: false,
+        fullPityFive: false
+      };
+      els.cards.innerHTML = '';
+      els.resultHint.textContent = '等待你的第一发';
+    }
+
+    function startChallenge(total) {
+      const endlessMode = state.challengeEndlessMode;
+      const perverseMode = state.challengePerverseMode;
+      const disableFeaturedGuarantee = perverseMode && state.challengeDisableFeaturedGuarantee;
+      resetSimulationCore();
+      state.challenge = emptyChallenge();
+      state.challenge.active = true;
+      state.challenge.total = total;
+      state.challenge.remaining = total;
+      state.challenge.endlessMode = endlessMode;
+      state.challenge.perverseMode = perverseMode;
+      state.challenge.disableFeaturedGuarantee = disableFeaturedGuarantee;
+      renderStats();
+      renderHistory();
+      renderAchievements();
+      renderChallengeStatus();
+      els.resultHint.textContent = `已开启 ${total} 抽挑战（${getChallengeConfigText(state.challenge)}）`;
+    }
+
+    function updateChallengeEndlessMode(enabled) {
+      if (state.challenge.active) {
+        els.challengeEndlessToggle.checked = state.challenge.endlessMode;
+        showRechargeToast('挑战中不能改变配置', 1400);
+        return;
+      }
+
+      state.challengeEndlessMode = enabled;
+      renderChallengeStatus();
+    }
+
+    function updateChallengePerverseMode(enabled) {
+      if (state.challenge.active) {
+        els.challengePerverseToggle.checked = state.challenge.perverseMode;
+        showRechargeToast('挑战中不能改变配置', 1400);
+        return;
+      }
+
+      state.challengePerverseMode = enabled;
+      if (!enabled) state.challengeDisableFeaturedGuarantee = false;
+      renderChallengeStatus();
+    }
+
+    function updateChallengeDisableFeaturedGuarantee(enabled) {
+      if (state.challenge.active) {
+        els.challengeDisableGuaranteeToggle.checked = state.challenge.disableFeaturedGuarantee;
+        showRechargeToast('挑战中不能改变配置', 1400);
+        return;
+      }
+
+      state.challengeDisableFeaturedGuarantee = state.challengePerverseMode && enabled;
+      renderChallengeStatus();
+    }
+
+    function addGrindHour() {
+      if (!state.challenge.active) return;
+      state.challenge.workHours += 1;
+      state.challenge.remaining += 5;
+      const perverseText = state.challenge.perverseMode
+        ? `；变态倍率降至 ${Math.round(getPerverseRateFactor(state.challenge.workHours) * 100)}%`
+        : '';
+      refreshAfterResourceChange(`爆肝成功：当前可用 ${state.challenge.remaining} 抽${perverseText}`);
+    }
+
+    function useMonthlyCard() {
+      if (!state.challenge.active || state.challenge.usedMonthlyCard) return;
+      state.challenge.usedMonthlyCard = true;
+      state.challenge.monthlyCardPulls += 18;
+      state.challenge.remaining += 18;
+      refreshAfterResourceChange(`月卡到账：当前可用 ${state.challenge.remaining} 抽`);
+    }
+
+    function recharge(yuan, pulls) {
+      if (!state.challenge.active) return;
+      state.challenge.rechargeYuan += yuan;
+      state.challenge.rechargePulls += pulls;
+      state.challenge.remaining += pulls;
+      refreshAfterResourceChange(`充值到账：当前可用 ${state.challenge.remaining} 抽`);
+      showRechargeToast(`充值成功 +${pulls} 抽`);
+    }
+
+    function buildReport(reason) {
+      const ch = state.challenge;
+      const usedPulls = state.totalPulls;
+      const workPulls = ch.workHours * 5;
+      const days = ch.workHours === 0 ? 0 : Math.ceil(ch.workHours / 4);
+      const savedMoneyByGrinding = workPulls * YUAN_PER_PULL_BENCHMARK;
+      const savedHoursByRecharge = ch.rechargePulls / 5;
+      const savedDaysByRecharge = savedHoursByRecharge === 0 ? 0 : Math.ceil(savedHoursByRecharge / 4);
+      const lines = [];
+
+      if (reason === 'up') {
+        lines.push('结果：你在挑战中成功抽到了 UP。');
+      } else if (reason === 'manual') {
+        lines.push('结果：你主动结束了这次挑战。');
+      } else {
+        lines.push('结果：挑战抽数已经耗尽，本次仍未抽到 UP。');
+      }
+
+      lines.push(`挑战模式：${ch.endlessMode ? '无尽模式，抽到 UP 后由你主动决定何时结束。' : '普通模式，抽到 UP 后自动结算。'}`);
+      if (ch.perverseMode) {
+        lines.push(`变态模式：已开启。当前基础概率倍率约为 ${Math.round(getPerverseRateFactor(ch.workHours) * 100)}%，${ch.disableFeaturedGuarantee ? '大保底机制已关闭' : '大保底机制保留'}。`);
+      } else {
+        lines.push('变态模式：未开启，基础概率保持正常。');
+      }
+      lines.push(`本次总共抽了 ${usedPulls} 抽。`);
+      lines.push(`其中你通过爆肝获得了 ${workPulls} 抽，共爆肝 ${ch.workHours} 小时。`);
+      lines.push(`按每天最多爆肝 4 小时计算，你大约玩了 ${days} 天。`);
+      lines.push(`你通过充值补进了 ${ch.rechargePulls} 抽，共花费 ${ch.rechargeYuan} 元。`);
+
+      if (ch.monthlyCardPulls > 0) {
+        lines.push(`你还使用了上个月攒下的月卡补给 ${ch.monthlyCardPulls} 抽，这部分不计入这次时间成本。`);
+      }
+
+      lines.push(`从换算角度看，这些爆肝大约替你省下了 ${savedMoneyByGrinding.toFixed(0)} 元。`);
+      lines.push(`而这些充值大约替你节约了 ${savedHoursByRecharge.toFixed(1)} 小时，也就是约 ${savedDaysByRecharge} 天的爆肝时间。`);
+
+      if (reason === 'manual') {
+        lines.push('其实你心里是很亏的吧？');
+      }
+
+      return lines.join('\n');
+    }
+
+    function formatReportFileDate(date) {
+      const pad = value => String(value).padStart(2, '0');
+      return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    }
+
+    function drawRoundRect(ctx, x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function wrapCanvasText(ctx, text, maxWidth) {
+      const lines = [];
+      let line = '';
+
+      Array.from(text).forEach(char => {
+        const testLine = line + char;
+        if (line && ctx.measureText(testLine).width > maxWidth) {
+          lines.push(line.trimEnd());
+          line = char.trimStart();
+        } else {
+          line = testLine;
+        }
+      });
+
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function dataUrlToBlob(dataUrl) {
+      const [header, base64] = dataUrl.split(',');
+      const mime = header.match(/:(.*?);/)[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+
+      return new Blob([bytes], { type: mime });
+    }
+
+    function buildReportImageBlob() {
+      const report = els.reportBody.textContent.trim();
+      if (!report) throw new Error('没有可保存的报告');
+
+      const width = 1080;
+      const margin = 72;
+      const contentWidth = width - margin * 2;
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCtx.font = '34px "Microsoft YaHei", "PingFang SC", sans-serif';
+
+      const reportLines = report.split('\n').flatMap(line => {
+        const wrapped = wrapCanvasText(tempCtx, line, contentWidth - 92);
+        return wrapped.length ? wrapped : [''];
+      });
+      const contentHeight = 150 + reportLines.length * 52;
+      const height = Math.max(1420, 610 + contentHeight + 120);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      const bg = ctx.createLinearGradient(0, 0, width, height);
+      bg.addColorStop(0, '#101527');
+      bg.addColorStop(0.48, '#1b274d');
+      bg.addColorStop(1, '#2d1f38');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = 'rgba(255, 210, 102, 0.18)';
+      ctx.beginPath();
+      ctx.arc(890, 120, 230, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(102, 179, 255, 0.15)';
+      ctx.beginPath();
+      ctx.arc(140, 1040, 320, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 139, 92, 0.12)';
+      ctx.beginPath();
+      ctx.arc(960, height - 210, 260, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 2;
+      for (let x = 48; x < width; x += 72) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x - 220, height);
+        ctx.stroke();
+      }
+
+      drawRoundRect(ctx, 48, 48, width - 96, 270, 42);
+      const header = ctx.createLinearGradient(48, 48, width - 48, 318);
+      header.addColorStop(0, 'rgba(255,255,255,0.18)');
+      header.addColorStop(1, 'rgba(255,255,255,0.07)');
+      ctx.fillStyle = header;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.stroke();
+
+      const logoGradient = ctx.createLinearGradient(92, 92, 218, 218);
+      logoGradient.addColorStop(0, '#fff1ad');
+      logoGradient.addColorStop(0.5, '#ffbd55');
+      logoGradient.addColorStop(1, '#ff7f5f');
+      ctx.fillStyle = logoGradient;
+      ctx.beginPath();
+      ctx.arc(156, 168, 72, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.fillStyle = '#241400';
+      ctx.font = '800 54px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('抽', 156, 158);
+      ctx.font = '800 22px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText('UP', 156, 207);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#fff7d7';
+      ctx.font = '800 66px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText('抽卡挑战报告', 260, 145);
+      ctx.fillStyle = 'rgba(238,242,255,0.82)';
+      ctx.font = '28px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText(new Date().toLocaleString('zh-CN', { hour12: false }), 262, 195);
+
+      drawRoundRect(ctx, 262, 222, 260, 52, 26);
+      ctx.fillStyle = state.challenge.obtainedUP ? 'rgba(142,240,192,0.20)' : 'rgba(255,216,168,0.18)';
+      ctx.fill();
+      ctx.strokeStyle = state.challenge.obtainedUP ? 'rgba(142,240,192,0.48)' : 'rgba(255,216,168,0.42)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#eef2ff';
+      ctx.font = '800 24px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText(state.challenge.obtainedUP ? 'UP 已到手' : '本次未到手', 288, 256);
+
+      drawRoundRect(ctx, 540, 222, 196, 52, 26);
+      ctx.fillStyle = state.challenge.endlessMode ? 'rgba(255,227,155,0.20)' : 'rgba(157,217,255,0.18)';
+      ctx.fill();
+      ctx.strokeStyle = state.challenge.endlessMode ? 'rgba(255,227,155,0.54)' : 'rgba(157,217,255,0.42)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#eef2ff';
+      ctx.font = '800 24px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText(state.challenge.endlessMode ? '无尽模式' : '普通模式', 566, 256);
+
+      drawRoundRect(ctx, 754, 222, 248, 52, 26);
+      ctx.fillStyle = state.challenge.perverseMode ? 'rgba(255,95,109,0.20)' : 'rgba(142,240,192,0.16)';
+      ctx.fill();
+      ctx.strokeStyle = state.challenge.perverseMode ? 'rgba(255,177,153,0.56)' : 'rgba(142,240,192,0.36)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#eef2ff';
+      ctx.font = '800 24px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText(
+        state.challenge.perverseMode
+          ? state.challenge.disableFeaturedGuarantee ? '变态·无大保底' : '变态模式'
+          : '标准概率',
+        780,
+        256
+      );
+
+      const statItems = [
+        ['总抽数', `${state.totalPulls} 抽`],
+        ['五星数量', `${state.fiveCount} 个`],
+        ['爆肝时间', `${state.challenge.workHours} 小时`],
+        ['充值花费', `${state.challenge.rechargeYuan} 元`]
+      ];
+      const statY = 360;
+      const statGap = 18;
+      const statW = (contentWidth - statGap * 3) / 4;
+      statItems.forEach(([label, value], index) => {
+        const x = margin + index * (statW + statGap);
+        drawRoundRect(ctx, x, statY, statW, 142, 28);
+        ctx.fillStyle = 'rgba(255,255,255,0.11)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(181,190,219,0.92)';
+        ctx.font = '24px "Microsoft YaHei", "PingFang SC", sans-serif';
+        ctx.fillText(label, x + 26, statY + 45);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 36px "Microsoft YaHei", "PingFang SC", sans-serif';
+        ctx.fillText(value, x + 26, statY + 101);
+      });
+
+      const cardY = 548;
+      const cardH = contentHeight;
+      drawRoundRect(ctx, margin, cardY, contentWidth, cardH, 38);
+      ctx.fillStyle = 'rgba(9, 13, 26, 0.58)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffe39b';
+      ctx.font = '800 34px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText('报告详情', margin + 46, cardY + 62);
+
+      let y = cardY + 124;
+      reportLines.forEach((line, index) => {
+        if (index === 0) {
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 34px "Microsoft YaHei", "PingFang SC", sans-serif';
+        } else {
+          ctx.fillStyle = 'rgba(238,242,255,0.90)';
+          ctx.font = '34px "Microsoft YaHei", "PingFang SC", sans-serif';
+        }
+        ctx.fillText(line, margin + 46, y);
+        y += 52;
+      });
+
+      const footerY = height - 90;
+      ctx.fillStyle = 'rgba(238,242,255,0.58)';
+      ctx.font = '24px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText('由抽卡模拟器生成 · 保存这张图，给未来的自己留个纪念', margin, footerY);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255,227,155,0.85)';
+      ctx.font = '800 26px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.fillText('GACHA REPORT', width - margin, footerY);
+
+      return dataUrlToBlob(canvas.toDataURL('image/png'));
+    }
+
+    function downloadBlob(blob, fileName) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function isLikelyMobileDevice() {
+      return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth <= 900);
+    }
+
+    async function saveImageOnDesktop(blob, fileName) {
+      if ('showDirectoryPicker' in window) {
+        try {
+          const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+          const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          showRechargeToast('报告图片已保存到选择的文件夹', 1800);
+          return;
+        } catch (error) {
+          if (error && error.name === 'AbortError') throw error;
+          console.warn('文件夹保存不可用，尝试另存或下载。', error);
+        }
+      }
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'PNG 图片',
+              accept: { 'image/png': ['.png'] }
+            }]
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          showRechargeToast('报告图片已保存', 1600);
+          return;
+        } catch (error) {
+          if (error && error.name === 'AbortError') throw error;
+          console.warn('另存为不可用，改为下载图片。', error);
+        }
+      }
+
+      downloadBlob(blob, fileName);
+      showRechargeToast('浏览器不支持选文件夹，已改为下载图片', 2400);
+    }
+
+    async function saveImageOnMobile(blob, fileName) {
+      if (typeof File === 'undefined') {
+        downloadBlob(blob, fileName);
+        showRechargeToast('已生成图片，可在下载中保存到相册', 2400);
+        return;
+      }
+
+      const file = new File([blob], fileName, { type: 'image/png' });
+      let canShareFile = false;
+      try {
+        canShareFile = Boolean(navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] })));
+      } catch (error) {
+        canShareFile = false;
+      }
+
+      if (canShareFile) {
+        try {
+          await navigator.share({
+            title: '抽卡挑战报告',
+            text: '保存这张抽卡挑战报告图片',
+            files: [file]
+          });
+          showRechargeToast('请在分享面板选择保存到相册', 2200);
+          return;
+        } catch (error) {
+          if (error && error.name === 'AbortError') throw error;
+          console.warn('系统分享不可用，改为下载图片。', error);
+        }
+      }
+
+      downloadBlob(blob, fileName);
+      showRechargeToast('已生成图片，可在下载中保存到相册', 2400);
+    }
+
+    async function saveReportImage() {
+      const btn = els.saveReportImageBtn;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '正在生成图片...';
+
+      try {
+        const blob = buildReportImageBlob();
+        const fileName = `抽卡挑战报告-${formatReportFileDate(new Date())}.png`;
+        if (isLikelyMobileDevice()) {
+          await saveImageOnMobile(blob, fileName);
+        } else {
+          await saveImageOnDesktop(blob, fileName);
+        }
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          showRechargeToast('已取消保存', 1200);
+        } else {
+          console.error(error);
+          showRechargeToast('保存失败，请重试', 1800);
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+
+    function finishChallenge(reason) {
+      const report = buildReport(reason);
+      state.challenge.active = false;
+      els.reportBody.textContent = report;
+      els.reportModal.classList.add('show');
+      renderChallengeStatus();
+    }
+
+    function closeReport() {
+      els.reportModal.classList.remove('show');
+    }
+
+    function resetAll() {
+      resetSimulationCore();
+      state.challenge = emptyChallenge();
+      renderStats();
+      renderHistory();
+      renderAchievements();
+      renderChallengeStatus();
+      closeReport();
+    }
+
+    els.singleBtn.addEventListener('click', () => doPull(1));
+    els.tenBtn.addEventListener('click', () => doPull(10));
+    els.mobileSingleBtn.addEventListener('click', () => doPull(1));
+    els.mobileTenBtn.addEventListener('click', () => doPull(10));
+    els.challenge10Btn.addEventListener('click', () => startChallenge(10));
+    els.challenge20Btn.addEventListener('click', () => startChallenge(20));
+    els.challenge30Btn.addEventListener('click', () => startChallenge(30));
+    els.challengeEndlessToggle.addEventListener('change', () => updateChallengeEndlessMode(els.challengeEndlessToggle.checked));
+    els.challengePerverseToggle.addEventListener('change', () => updateChallengePerverseMode(els.challengePerverseToggle.checked));
+    els.challengeDisableGuaranteeToggle.addEventListener('change', () => updateChallengeDisableFeaturedGuarantee(els.challengeDisableGuaranteeToggle.checked));
+    els.grindBtn.addEventListener('click', addGrindHour);
+    els.monthlyBtn.addEventListener('click', useMonthlyCard);
+    els.endChallengeBtn.addEventListener('click', () => {
+      if (state.challenge.active) finishChallenge('manual');
+    });
+    els.rechargeBtns.forEach(btn => {
+      btn.addEventListener('click', () => recharge(Number(btn.dataset.yuan), Number(btn.dataset.pulls)));
+    });
+    els.resetBtn.addEventListener('click', resetAll);
+    els.saveReportImageBtn.addEventListener('click', saveReportImage);
+    els.closeModalBtn.addEventListener('click', closeReport);
+    els.reportModal.addEventListener('click', (e) => {
+      if (e.target === els.reportModal) closeReport();
+    });
+
+    renderStats();
+    renderHistory();
+    renderAchievements();
+    renderChallengeStatus();
+  </script>
+</body>
+</html>
